@@ -1,3 +1,4 @@
+export const runtime = 'edge';
 import { v2 as cloudinary } from "cloudinary";
 
 // Cloudinary Configuration (.env.local se keys automatically fetch hongi)

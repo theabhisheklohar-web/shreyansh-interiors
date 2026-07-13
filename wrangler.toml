@@ -1,0 +1,8 @@
+name = "shreyansh-interiors"
+compatibility_date = "2024-03-20"
+pages_build_output_dir = ".vercel/output/static"
+compatibility_flags = [ "nodejs_compat" ]
+[[d1_databases]]
+binding = "DB"
+database_name = "shreyansh-db"
+database_id = "fce09e81-2044-4a7f-8a8d-da7863f99d7b"

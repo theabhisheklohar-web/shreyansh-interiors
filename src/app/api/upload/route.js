@@ -1,12 +1,4 @@
 export const runtime = 'edge';
-import { v2 as cloudinary } from "cloudinary";
-
-// Cloudinary Configuration (.env.local se keys automatically fetch hongi)
-cloudinary.config({
-  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
 
 export async function POST(request) {
   try {
@@ -14,32 +6,40 @@ export async function POST(request) {
     const file = formData.get("file");
 
     if (!file) {
-      return Response.json({ error: "Koi image file nahi mili!" }, { status: 400 });
+      return Response.json({ success: false, error: "File nahi mili!" }, { status: 400 });
     }
 
-    // File ko buffer mein convert kar rahe hain taaki Cloudinary read kar sake
-    const bytes = await file.arrayBuffer();
-    const buffer = Buffer.from(bytes);
+    // File ko ArrayBuffer me convert karna Edge compatibility ke liye
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = new Uint8Array(arrayBuffer);
 
-    // Cloudinary upload process (Stream ke through)
-    const uploadResult = await new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        { folder: "shreyansh-interiors" }, // Cloudinary par is folder me images jayengi
-        (error, result) => {
-          if (error) reject(error);
-          else resolve(result);
-        }
-      );
-      uploadStream.end(buffer);
+    // Cloudflare dashboard se variables uthana
+    const cloudName = process.env.CLOUDINARY_CLOUD_NAME;
+    const uploadPreset = process.env.CLOUDINARY_UPLOAD_PRESET;
+
+    if (!cloudName || !uploadPreset) {
+      return Response.json({ success: false, error: "Cloudinary credentials missing in dashboard!" }, { status: 500 });
+    }
+
+    // Cloudinary REST API Form Data taiyar karna
+    const cloudinaryFormData = new FormData();
+    cloudinaryFormData.append("file", new Blob([buffer], { type: file.type }));
+    cloudinaryFormData.append("upload_preset", uploadPreset);
+
+    // Direct HTTP Request bhejna bina kisi external SDK ke
+    const res = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+      method: "POST",
+      body: cloudinaryFormData,
     });
 
-    // Upload successful hone par secure URL return karega
-    return Response.json({ 
-      success: true, 
-      url: uploadResult.secure_url 
-    });
+    const data = await res.json();
 
+    if (data.secure_url) {
+      return Response.json({ success: true, url: data.secure_url });
+    } else {
+      return Response.json({ success: false, error: data.error?.message || "Upload failed" }, { status: 500 });
+    }
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ success: false, error: "Upload Crash: " + error.message }, { status: 500 });
   }
 }
